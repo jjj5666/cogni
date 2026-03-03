@@ -78,6 +78,11 @@ export async function* streamChat(modelId, messages, sessionToken, options = {})
 }
 
 export async function login(username, password) {
+  // 本地开发模式：跳过服务端验证
+  if (import.meta.env.DEV && import.meta.env.VITE_DEV_MODE) {
+    return { ok: true, token: 'dev-token', username };
+  }
+
   const res = await fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
