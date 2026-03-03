@@ -1,6 +1,6 @@
 // Debug: test OpenRouter connection from Vercel serverless
 export default async function handler(req, res) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
 
   try {
     const r = await fetch('https://openrouter.ai/api/v1/auth/key', {

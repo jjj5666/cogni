@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
 
   // Debug: log what we're sending
   const requestBody = JSON.stringify(req.body);

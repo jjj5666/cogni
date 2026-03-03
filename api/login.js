@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   const { username, password } = req.body || {};
 
   const validUser = process.env.COGNI_USERNAME || 'jjj';
-  const validPass = process.env.COGNI_PASSWORD;
+  const validPass = (process.env.COGNI_PASSWORD || '').trim();
 
   if (!validPass) return res.status(500).json({ error: 'Password not configured' });
 
