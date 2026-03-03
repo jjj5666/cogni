@@ -42,20 +42,44 @@ export async function* streamChat(modelId, messages, sessionToken, options = {})
     headers['Authorization'] = `Bearer ${sessionToken}`;
   }
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body)
-  });
+  console.log('[Cogni] sending to:', url, 'model:', modelId, 'direct:', direct);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body)
+    });
+  } catch (fetchErr) {
+    console.error('[Cogni] fetch failed:', fetchErr);
+    throw new Error('网络请求失败: ' + fetchErr.message);
+  }
+
+  console.log('[Cogni] response status:', response.status);
 
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: { message: response.statusText } }));
-    throw new Error(err.error?.message || err.error || `API Error ${response.status}`);
+    const errText = await response.text().catch(() => '');
+    console.error('[Cogni] API error:', response.status, errText);
+    let msg = `API Error ${response.status}`;
+    try { const j = JSON.parse(errText); msg = j.error?.message || j.error || msg; } catch {}
+    throw new Error(msg);
+  }
+
+  if (!response.body) {
+    // 非流式 fallback
+    const data = await response.json();
+    console.log('[Cogni] non-stream response:', data);
+    if (data.choices?.[0]?.message) {
+      yield { choices: [{ delta: data.choices[0].message }] };
+    }
+    return;
   }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  let chunkCount = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -71,10 +95,13 @@ export async function* streamChat(modelId, messages, sessionToken, options = {})
       const data = trimmed.slice(6);
       if (data === '[DONE]') continue;
       try {
-        yield JSON.parse(data);
+        const parsed = JSON.parse(data);
+        chunkCount++;
+        yield parsed;
       } catch {}
     }
   }
+  console.log('[Cogni] stream done, chunks:', chunkCount);
 }
 
 export async function login(username, password) {

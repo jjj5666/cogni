@@ -15,6 +15,7 @@ export default async function handler(req, res) {
   }
 
   const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
+  if (!apiKey) return res.status(500).json({ error: 'API key not configured' });
 
   // Debug: log what we're sending
   const requestBody = JSON.stringify(req.body);

@@ -205,6 +205,7 @@ export default function App() {
         messages: [...newMessages, { role: 'assistant', content: fullContent, reasoning: fullReasoning || null, ts: now() }]
       });
     } catch (err) {
+      console.error('[Cogni] chat error:', err);
       setError(err.message);
     } finally {
       setIsLoading(false);
