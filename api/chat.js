@@ -1,5 +1,8 @@
-// Vercel Serverless Function - 代理 OpenRouter API
-// API Key 存在 Vercel 环境变量里，前端永远看不到
+// Vercel Serverless Function - 代理 OpenRouter API (Node.js runtime)
+
+export const config = {
+  maxDuration: 60, // 允许 60 秒超时（流式响应需要）
+};
 
 export default async function handler(req, res) {
   // CORS
@@ -22,35 +25,49 @@ export default async function handler(req, res) {
   if (!OPENROUTER_KEY) return res.status(500).json({ error: 'API key not configured' });
 
   try {
-    const body = req.body;
+    const body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${OPENROUTER_KEY}`,
-        'HTTP-Referer': 'https://cogni.app',
+        'HTTP-Referer': 'https://cogni-phi-one.vercel.app',
         'X-Title': 'Cogni'
       },
-      body: JSON.stringify(body)
+      body
     });
 
-    // Stream the response
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).end(errText);
+    }
+
+    // Stream: pipe response body to client
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
+    // Use Web Streams API (Node 18+)
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      res.write(decoder.decode(value, { stream: true }));
-    }
+    const pump = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); return; }
+        const ok = res.write(decoder.decode(value, { stream: true }));
+        if (!ok) await new Promise(resolve => res.once('drain', resolve));
+      }
+    };
 
-    res.end();
+    await pump();
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Chat proxy error:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message });
+    } else {
+      res.end();
+    }
   }
 }
